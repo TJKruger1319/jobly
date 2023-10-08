@@ -44,13 +44,18 @@ class Company {
     return company;
   }
 
-  /** Find all companies.
+  /** Find all companies (With usable filters).
+   * 
+   * Possible optional filters:
+   * - Name
+   * - minEmployees
+   * - maxEmployees
    *
    * Returns [{ handle, name, description, numEmployees, logoUrl }, ...]
    * */
 
-  static async findAll() {
-    const companiesRes = await db.query(
+  static async findAll(searchFilters = {}) {
+    let query = await db.query(
           `SELECT handle,
                   name,
                   description,
@@ -58,6 +63,40 @@ class Company {
                   logo_url AS "logoUrl"
            FROM companies
            ORDER BY name`);
+    let whereExpressions = [];
+    let queryValues = [];
+
+    const { minEmployees, maxEmployees, name } = searchFilters;
+
+    // Throws an error if the minimum amount of employees is bigger the maximum
+    if (minEmployees > maxEmployees) {
+      throw new BadRequestError("Minimum employees cannot be greater than the maximum.")
+    }
+
+    // Adds to whereExpressions and queryValues for each possible search term to
+    // generate the correct SQL
+
+    if (minEmployees !== undefined) {
+      queryValues.push(minEmployees);
+      whereExpressions.push(`num_employees >= $${queryValues.length}`);
+    }
+
+    if (maxEmployees !== undefined) {
+      queryValues.push(maxEmployees);
+      whereExpressions.push(`num_employees <= $${queryValues.length}`);
+    }
+
+    if (name) {
+      queryValues.push(`%${name}%`);
+      whereExpressions.push(`name ILIKE $${queryValues.length}`);
+    }
+
+    if (whereExpressions.length > 0) {
+      query += " WHERE " + whereExpressions.join(" AND ");
+    }
+
+    query += " ORDER BY name";
+    const companiesRes = await db.query(query, queryValues);
     return companiesRes.rows;
   }
 
@@ -83,6 +122,16 @@ class Company {
     const company = companyRes.rows[0];
 
     if (!company) throw new NotFoundError(`No company: ${handle}`);
+
+    const jobsRes = await db.query(
+      `SELECT id, title, salary, equity
+       FROM jobs
+       WHERE company_handle = $1
+       ORDER BY id`,
+      [handle],
+    );
+
+    company.jobs = jobsRes.rows;
 
     return company;
   }
