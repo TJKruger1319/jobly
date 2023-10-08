@@ -24,7 +24,7 @@ const router = express.Router();
  * This returns the newly created user and an authentication token for them:
  *  {user: { username, firstName, lastName, email, isAdmin }, token }
  *
- * Authorization required: login
+ * Authorization required: admin or same username
  **/
 
 router.post("/", ensureAdmin, async function (req, res, next) {
@@ -48,7 +48,7 @@ router.post("/", ensureAdmin, async function (req, res, next) {
  *
  * Returns list of all users.
  *
- * Authorization required: login
+ * Authorization required: admin
  **/
 
 router.get("/", ensureAdmin, async function (req, res, next) {
@@ -65,7 +65,7 @@ router.get("/", ensureAdmin, async function (req, res, next) {
  *
  * Returns { username, firstName, lastName, isAdmin }
  *
- * Authorization required: login
+ * Authorization required: admin or same username
  **/
 
 router.get("/:username", ensureCorrectUserOrAdmin, async function (req, res, next) {
@@ -85,7 +85,7 @@ router.get("/:username", ensureCorrectUserOrAdmin, async function (req, res, nex
  *
  * Returns { username, firstName, lastName, email, isAdmin }
  *
- * Authorization required: login
+ * Authorization required: admin or same username
  **/
 
 router.patch("/:username", ensureCorrectUserOrAdmin, async function (req, res, next) {
@@ -106,7 +106,7 @@ router.patch("/:username", ensureCorrectUserOrAdmin, async function (req, res, n
 
 /** DELETE /[username]  =>  { deleted: username }
  *
- * Authorization required: login
+ * Authorization required: admin or same username
  **/
 
 router.delete("/:username", ensureCorrectUserOrAdmin, async function (req, res, next) {
@@ -117,6 +117,21 @@ router.delete("/:username", ensureCorrectUserOrAdmin, async function (req, res, 
     return next(err);
   }
 });
+
+/** POST /[username]/jobs/[id] => { applied: id }
+ * 
+ * Authorization required: admin or same username
+ */
+
+router.post("/:username/jobs/:id", ensureCorrectUserOrAdmin, async function(req, res, next){
+  try {
+    const jobId = +req.params.id
+    await User.applyForJob(req.params.username, jobId);
+    return res.json({ applied: id });
+  } catch (err) {
+    return next(err);
+  }
+})
 
 
 module.exports = router;
